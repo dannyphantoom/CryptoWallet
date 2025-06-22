@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 const ENCRYPTION_KEY = 'crypto_wallet_encryption_key';
 const WALLET_PREFIX = 'wallet_';
@@ -8,6 +9,7 @@ const USER_PREFIX = 'user_';
 export class SecurityManager {
   private static instance: SecurityManager;
   private encryptionKey: string | null = null;
+  private isWeb: boolean = Platform.OS === 'web';
 
   private constructor() {}
 
@@ -18,15 +20,35 @@ export class SecurityManager {
     return SecurityManager.instance;
   }
 
+  private async getSecureItem(key: string): Promise<string | null> {
+    if (this.isWeb) {
+      // Use localStorage for web
+      return localStorage.getItem(key);
+    } else {
+      // Use SecureStore for mobile
+      return await SecureStore.getItemAsync(key);
+    }
+  }
+
+  private async setSecureItem(key: string, value: string): Promise<void> {
+    if (this.isWeb) {
+      // Use localStorage for web
+      localStorage.setItem(key, value);
+    } else {
+      // Use SecureStore for mobile
+      await SecureStore.setItemAsync(key, value);
+    }
+  }
+
   async initialize(): Promise<void> {
     try {
       // Try to get existing encryption key
-      this.encryptionKey = await SecureStore.getItemAsync(ENCRYPTION_KEY);
+      this.encryptionKey = await this.getSecureItem(ENCRYPTION_KEY);
       
       if (!this.encryptionKey) {
         // Generate new encryption key
         this.encryptionKey = await this.generateEncryptionKey();
-        await SecureStore.setItemAsync(ENCRYPTION_KEY, this.encryptionKey);
+        await this.setSecureItem(ENCRYPTION_KEY, this.encryptionKey);
       }
     } catch (error) {
       console.error('Failed to initialize security manager:', error);
@@ -55,7 +77,8 @@ export class SecurityManager {
         })
         .join('');
       
-      return Buffer.from(encrypted).toString('base64');
+      // Use btoa instead of Buffer for base64 encoding
+      return btoa(encrypted);
     } catch (error) {
       console.error('Encryption failed:', error);
       throw new Error('Failed to encrypt private key');
@@ -68,7 +91,8 @@ export class SecurityManager {
     }
 
     try {
-      const encrypted = Buffer.from(encryptedPrivateKey, 'base64').toString();
+      // Use atob instead of Buffer for base64 decoding
+      const encrypted = atob(encryptedPrivateKey);
       
       // Simple XOR decryption
       const decrypted = encrypted

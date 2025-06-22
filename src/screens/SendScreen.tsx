@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -84,9 +85,9 @@ export const SendScreen: React.FC<SendScreenProps> = ({ navigation, route }) => 
     const newErrors: { address?: string; amount?: string } = {};
 
     if (!recipientAddress.trim()) {
-      newErrors.address = 'Recipient address is required';
-    } else if (recipientAddress.length < 20) {
-      newErrors.address = 'Please enter a valid wallet address';
+      newErrors.address = 'Recipient is required';
+    } else if (recipientAddress.length < 3) {
+      newErrors.address = 'Please enter a valid username, email, or wallet address';
     }
 
     if (!amount.trim()) {
@@ -106,15 +107,32 @@ export const SendScreen: React.FC<SendScreenProps> = ({ navigation, route }) => 
 
     setLoading(true);
     try {
+      // First, resolve the recipient address if it's a username or email
+      let resolvedAddress = recipientAddress;
+      let recipientInfo = null;
+
+      if (!recipientAddress.startsWith('0x') && !recipientAddress.startsWith('bc1') && !recipientAddress.startsWith('1') && !recipientAddress.startsWith('3')) {
+        // Looks like username or email, try to resolve
+        recipientInfo = await walletService.findUserByIdentifier(recipientAddress);
+        if (recipientInfo) {
+          resolvedAddress = recipientInfo.address;
+        } else {
+          Alert.alert('User Not Found', 'Could not find user with that username or email');
+          return;
+        }
+      }
+
       const result = await walletService.sendTransaction(
         selectedWallet.id,
-        recipientAddress,
+        resolvedAddress,
         parseFloat(amount)
       );
 
+      const recipientDisplayName = recipientInfo?.username || resolvedAddress.substring(0, 10) + '...';
+      
       Alert.alert(
         'Transaction Sent',
-        `Successfully sent ${amount} ${getCryptoSymbol(selectedWallet.type)} to ${recipientAddress.substring(0, 10)}...`,
+        `Successfully sent ${amount} ${getCryptoSymbol(selectedWallet.type)} to ${recipientDisplayName}`,
         [
           {
             text: 'OK',
@@ -186,15 +204,21 @@ export const SendScreen: React.FC<SendScreenProps> = ({ navigation, route }) => 
           {/* Transaction Form */}
           <View style={styles.section}>
             <Input
-              label="Recipient Address"
-              placeholder="Enter wallet address"
+              label="Recipient"
+              placeholder="Enter username, email, or wallet address"
               value={recipientAddress}
               onChangeText={setRecipientAddress}
               error={errors.address}
               rightIcon="copy-outline"
-              onRightIconPress={() => {
-                // TODO: Implement paste from clipboard
-                Alert.alert('Feature', 'Paste from clipboard feature will be implemented');
+              onRightIconPress={async () => {
+                try {
+                  const clipboardText = await Clipboard.getStringAsync();
+                  if (clipboardText) {
+                    setRecipientAddress(clipboardText);
+                  }
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to paste from clipboard');
+                }
               }}
             />
 

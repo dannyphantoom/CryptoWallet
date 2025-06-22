@@ -51,7 +51,14 @@ export const Button: React.FC<ButtonProps> = ({
       style={buttonStyle}
       onPress={() => {
         console.log(`Button "${title}" pressed`);
-        onPress();
+        console.log(`Button disabled: ${disabled || loading}`);
+        console.log(`Loading state: ${loading}`);
+        if (!disabled && !loading) {
+          console.log(`Calling onPress for "${title}"`);
+          onPress();
+        } else {
+          console.log(`Button press blocked - disabled: ${disabled}, loading: ${loading}`);
+        }
       }}
       disabled={disabled || loading}
       activeOpacity={0.8}

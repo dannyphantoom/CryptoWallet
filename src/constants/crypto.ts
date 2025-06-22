@@ -1,5 +1,6 @@
 import { CryptoInfo, NetworkConfig, CryptoType } from '../types';
 import { COLORS } from './theme';
+import { CONFIG } from '../../config';
 
 export const SUPPORTED_CRYPTOS: CryptoInfo[] = [
   {
@@ -31,24 +32,24 @@ export const SUPPORTED_CRYPTOS: CryptoInfo[] = [
 export const NETWORKS: Record<CryptoType, NetworkConfig> = {
   [CryptoType.ETHEREUM]: {
     name: 'Ethereum Mainnet',
-    rpcUrl: 'https://mainnet.infura.io/v3/YOUR_INFURA_KEY',
-    chainId: 1,
+    rpcUrl: CONFIG.ethereum.rpcUrl,
+    chainId: CONFIG.ethereum.chainId,
     symbol: 'ETH',
-    explorerUrl: 'https://etherscan.io',
+    explorerUrl: CONFIG.ethereum.explorerUrl,
   },
   [CryptoType.BITCOIN]: {
     name: 'Bitcoin Mainnet',
-    rpcUrl: 'https://blockstream.info/api',
+    rpcUrl: CONFIG.bitcoin.rpcUrl,
     chainId: 0,
     symbol: 'BTC',
-    explorerUrl: 'https://blockstream.info',
+    explorerUrl: CONFIG.bitcoin.explorerUrl,
   },
   [CryptoType.SOLANA]: {
     name: 'Solana Mainnet',
-    rpcUrl: 'https://api.mainnet-beta.solana.com',
-    chainId: 101,
+    rpcUrl: CONFIG.solana.rpcUrl,
+    chainId: CONFIG.solana.chainId,
     symbol: 'SOL',
-    explorerUrl: 'https://explorer.solana.com',
+    explorerUrl: CONFIG.solana.explorerUrl,
   },
 };
 

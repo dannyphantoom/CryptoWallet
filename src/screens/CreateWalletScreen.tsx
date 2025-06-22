@@ -53,35 +53,45 @@ export const CreateWalletScreen: React.FC<CreateWalletScreenProps> = ({ navigati
   };
 
   const handleCreateWallet = async () => {
-    if (!validateForm() || !currentUser || !selectedCrypto) return;
+    console.log('handleCreateWallet called');
+    console.log('selectedCrypto:', selectedCrypto);
+    console.log('walletName:', walletName);
+    console.log('currentUser:', currentUser);
+    
+    if (!validateForm() || !currentUser || !selectedCrypto) {
+      console.log('Validation failed or missing data');
+      console.log('validateForm():', validateForm());
+      console.log('currentUser exists:', !!currentUser);
+      console.log('selectedCrypto exists:', !!selectedCrypto);
+      return;
+    }
 
     setLoading(true);
     try {
+      console.log('Attempting to create wallet...');
       const wallet = await walletService.createWallet(
         currentUser.id,
         selectedCrypto,
         walletName.trim()
       );
 
-      Alert.alert(
-        'Wallet Created!',
-        `Your ${getCryptoName(selectedCrypto)} wallet "${walletName}" has been created successfully.`,
-        [
-          {
-            text: 'View Wallet',
-            onPress: () => {
-              navigation.replace('WalletDetail', { walletId: wallet.id });
-            },
-          },
-          {
-            text: 'Back to Dashboard',
-            onPress: () => {
-              navigation.navigate('MainTabs');
-            },
-          },
-        ]
-      );
+      console.log('Wallet created successfully:', wallet);
+
+      // Show success message and navigate back to dashboard
+      // Note: Alert doesn't work well in React Native Web, so we'll navigate directly
+      console.log(`✅ Success: ${getCryptoName(selectedCrypto)} wallet "${walletName}" created!`);
+      
+      // Navigate back to dashboard to show the new wallet
+      navigation.navigate('MainTabs', { 
+        screen: 'Dashboard',
+        params: { 
+          newWalletCreated: true,
+          walletName: walletName,
+          cryptoType: selectedCrypto 
+        }
+      });
     } catch (error) {
+      console.error('Error creating wallet:', error);
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to create wallet');
     } finally {
       setLoading(false);
@@ -158,8 +168,7 @@ export const CreateWalletScreen: React.FC<CreateWalletScreenProps> = ({ navigati
           showsVerticalScrollIndicator={true}
           bounces={true}
           keyboardShouldPersistTaps="handled"
-          alwaysBounceVertical={false}
-          nestedScrollEnabled={true}
+          alwaysBounceVertical={true}
         >
           {/* Step 1: Select Cryptocurrency */}
           <View style={styles.section}>
@@ -289,41 +298,6 @@ export const CreateWalletScreen: React.FC<CreateWalletScreenProps> = ({ navigati
               • All wallets are secured with encryption
             </Text>
           </Card>
-
-          {/* Temporary test content to force scrolling */}
-          <View style={styles.testSection}>
-            <Text style={styles.sectionTitle}>Test Scrolling Section</Text>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 1 - This is to test scrolling</Text>
-            </View>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 2 - This is to test scrolling</Text>
-            </View>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 3 - This is to test scrolling</Text>
-            </View>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 4 - This is to test scrolling</Text>
-            </View>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 5 - This is to test scrolling</Text>
-            </View>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 6 - This is to test scrolling</Text>
-            </View>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 7 - This is to test scrolling</Text>
-            </View>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 8 - This is to test scrolling</Text>
-            </View>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 9 - This is to test scrolling</Text>
-            </View>
-            <View style={styles.testItem}>
-              <Text style={styles.helpText}>Test item 10 - This is to test scrolling</Text>
-            </View>
-          </View>
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -365,9 +339,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
     padding: SIZES.spacingLg,
     paddingBottom: SIZES.spacingXxl * 3,
+    minHeight: '120%',
   },
   section: {
     marginBottom: SIZES.spacingXl,
@@ -509,15 +483,5 @@ const styles = StyleSheet.create({
     fontSize: SIZES.fontSizeSm,
     color: COLORS.textSecondary,
     marginBottom: SIZES.spacingSm,
-  },
-  testSection: {
-    marginBottom: SIZES.spacingXl,
-  },
-  testItem: {
-    padding: SIZES.spacingMd,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: SIZES.radius,
-    marginBottom: SIZES.spacingMd,
   },
 }); 

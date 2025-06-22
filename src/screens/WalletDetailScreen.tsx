@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { PriceChart } from '../components/PriceChart';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { SUPPORTED_CRYPTOS } from '../constants/crypto';
 import { walletService } from '../services/walletService';
@@ -114,7 +115,7 @@ export const WalletDetailScreen: React.FC<WalletDetailScreenProps> = ({ navigati
   };
 
   const calculateUSDValue = (balance: number, cryptoType: CryptoType) => {
-    // Mock exchange rates for demo
+    // Mock exchange rates for demo - in production, use priceService
     const rates = {
       [CryptoType.ETHEREUM]: 2000,
       [CryptoType.BITCOIN]: 45000,
@@ -172,7 +173,7 @@ export const WalletDetailScreen: React.FC<WalletDetailScreenProps> = ({ navigati
           showsVerticalScrollIndicator={false}
         >
           {/* Wallet Overview Card */}
-          <Card style={[styles.overviewCard, { borderColor: getCryptoColor(wallet.type) }]}>
+          <Card style={StyleSheet.flatten([styles.overviewCard, { borderColor: getCryptoColor(wallet.type) }])}>
             <View style={styles.walletHeader}>
               <View style={[styles.cryptoIcon, { backgroundColor: getCryptoColor(wallet.type) + '20' }]}>
                 <Text style={styles.cryptoIconText}>{getCryptoIcon(wallet.type)}</Text>
@@ -210,6 +211,13 @@ export const WalletDetailScreen: React.FC<WalletDetailScreenProps> = ({ navigati
               />
             </View>
           </Card>
+
+          {/* Price Chart */}
+          <PriceChart 
+            cryptoType={wallet.type}
+            height={250}
+            style={styles.chartContainer}
+          />
 
           {/* Address Card */}
           <Card style={styles.addressCard}>
@@ -523,5 +531,8 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     flex: 1,
     marginLeft: SIZES.spacingMd,
+  },
+  chartContainer: {
+    marginBottom: SIZES.spacingLg,
   },
 }); 

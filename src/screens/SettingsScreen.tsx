@@ -7,14 +7,19 @@ import {
   TouchableOpacity,
   Alert,
   Switch,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { Input } from '../components/Input';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { authService } from '../services/authService';
+import { configService } from '../services/configService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SettingsScreenProps {
   navigation: any;
@@ -25,6 +30,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [priceAlertsEnabled, setPriceAlertsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [currentApiKeyType, setCurrentApiKeyType] = useState<'infura' | 'coingecko' | 'custom_eth' | 'custom_btc' | 'custom_sol'>('infura');
+  const [apiKeyValue, setApiKeyValue] = useState('');
 
   const currentUser = authService.getCurrentUser();
 
@@ -100,6 +108,44 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
     );
   };
 
+  const handleApiKeyConfig = (keyType: 'infura' | 'coingecko' | 'custom_eth' | 'custom_btc' | 'custom_sol') => {
+    setCurrentApiKeyType(keyType);
+    // Load existing API key if available
+    loadApiKey(keyType);
+    setModalVisible(true);
+  };
+
+  const loadApiKey = async (keyType: string) => {
+    try {
+      const savedKey = await AsyncStorage.getItem(`api_key_${keyType}`);
+      setApiKeyValue(savedKey || '');
+    } catch (error) {
+      console.error('Failed to load API key:', error);
+      setApiKeyValue('');
+    }
+  };
+
+  const saveApiKey = async () => {
+    try {
+      if (apiKeyValue.trim()) {
+        await AsyncStorage.setItem(`api_key_${currentApiKeyType}`, apiKeyValue.trim());
+        Alert.alert('Success', 'API key saved successfully');
+      } else {
+        await AsyncStorage.removeItem(`api_key_${currentApiKeyType}`);
+        Alert.alert('Success', 'API key removed');
+      }
+      
+      // Clear the config cache so new API keys take effect immediately
+      configService.clearCache();
+      
+      setModalVisible(false);
+      setApiKeyValue('');
+    } catch (error) {
+      console.error('Failed to save API key:', error);
+      Alert.alert('Error', 'Failed to save API key');
+    }
+  };
+
   const settingSections = [
     {
       title: 'Account',
@@ -121,6 +167,41 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
           title: 'Two-Factor Authentication',
           subtitle: 'Add an extra layer of security',
           onPress: () => Alert.alert('Feature', '2FA setup coming soon'),
+        },
+      ],
+    },
+    {
+      title: 'Network Settings',
+      items: [
+        {
+          icon: 'server-outline',
+          title: 'Ethereum API Key',
+          subtitle: 'Configure your Infura API key for Ethereum',
+          onPress: () => handleApiKeyConfig('infura'),
+        },
+        {
+          icon: 'analytics-outline',
+          title: 'Price Data API',
+          subtitle: 'CoinGecko API key for price data',
+          onPress: () => handleApiKeyConfig('coingecko'),
+        },
+        {
+          icon: 'settings-outline',
+          title: 'Custom Ethereum RPC',
+          subtitle: 'Set custom Ethereum RPC endpoint',
+          onPress: () => handleApiKeyConfig('custom_eth'),
+        },
+        {
+          icon: 'cube-outline',
+          title: 'Custom Bitcoin RPC',
+          subtitle: 'Set custom Bitcoin RPC endpoint',
+          onPress: () => handleApiKeyConfig('custom_btc'),
+        },
+        {
+          icon: 'diamond-outline',
+          title: 'Custom Solana RPC',
+          subtitle: 'Set custom Solana RPC endpoint',
+          onPress: () => handleApiKeyConfig('custom_sol'),
         },
       ],
     },
@@ -350,7 +431,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
           <Button
             title="Delete Account"
             onPress={handleDeleteAccount}
-            style={[styles.deleteButton, { backgroundColor: COLORS.error }]}
+            style={StyleSheet.flatten([styles.deleteButton, { backgroundColor: COLORS.error }])}
           />
 
           {/* Footer */}
@@ -364,6 +445,73 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) =>
           </View>
         </ScrollView>
       </LinearGradient>
+
+      {/* API Key Configuration Modal */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {currentApiKeyType === 'infura' && 'Ethereum API Key'}
+              {currentApiKeyType === 'coingecko' && 'Price Data API Key'}
+              {currentApiKeyType === 'custom_eth' && 'Custom Ethereum RPC'}
+              {currentApiKeyType === 'custom_btc' && 'Custom Bitcoin RPC'}
+              {currentApiKeyType === 'custom_sol' && 'Custom Solana RPC'}
+            </Text>
+          </View>
+
+          <View style={styles.modalContent}>
+            <Text style={styles.modalDescription}>
+              {currentApiKeyType === 'infura' && 'Enter your Infura API key to connect to Ethereum network. Get your free API key at infura.io'}
+              {currentApiKeyType === 'coingecko' && 'Enter your CoinGecko API key for enhanced price data limits. This is optional.'}
+              {currentApiKeyType === 'custom_eth' && 'Enter a custom Ethereum RPC endpoint URL'}
+              {currentApiKeyType === 'custom_btc' && 'Enter a custom Bitcoin RPC endpoint URL'}
+              {currentApiKeyType === 'custom_sol' && 'Enter a custom Solana RPC endpoint URL'}
+            </Text>
+
+            <Input
+              label={
+                currentApiKeyType.includes('custom') ? 'RPC URL' : 'API Key'
+              }
+              value={apiKeyValue}
+              onChangeText={setApiKeyValue}
+              placeholder={
+                currentApiKeyType === 'infura' ? 'Your Infura API key...' :
+                currentApiKeyType === 'coingecko' ? 'Your CoinGecko API key...' :
+                currentApiKeyType === 'custom_eth' ? 'https://mainnet.infura.io/v3/YOUR_KEY' :
+                currentApiKeyType === 'custom_btc' ? 'https://blockstream.info/api' :
+                'https://api.mainnet-beta.solana.com'
+              }
+              secureTextEntry={!currentApiKeyType.includes('custom')}
+              style={styles.modalInput}
+            />
+
+            <View style={styles.modalButtons}>
+              <Button
+                title="Cancel"
+                onPress={() => setModalVisible(false)}
+                variant="outline"
+                style={StyleSheet.flatten([styles.modalButton, { marginRight: SIZES.spacingMd }])}
+              />
+              <Button
+                title="Save"
+                onPress={saveApiKey}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -503,5 +651,50 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     textAlign: 'center',
     marginBottom: SIZES.spacingXs,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SIZES.spacingLg,
+    paddingVertical: SIZES.spacingMd,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalCloseButton: {
+    padding: SIZES.spacingSm,
+  },
+  modalTitle: {
+    ...FONTS.bold,
+    fontSize: SIZES.fontSizeLg,
+    color: COLORS.textPrimary,
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 40, // Balance the close button
+  },
+  modalContent: {
+    flex: 1,
+    padding: SIZES.spacingLg,
+  },
+  modalDescription: {
+    ...FONTS.regular,
+    fontSize: SIZES.fontSizeSm,
+    color: COLORS.textSecondary,
+    marginBottom: SIZES.spacingLg,
+    lineHeight: 20,
+  },
+  modalInput: {
+    marginBottom: SIZES.spacingLg,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
   },
 }); 

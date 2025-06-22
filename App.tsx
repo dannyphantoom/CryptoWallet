@@ -16,6 +16,7 @@ import { CreateWalletScreen } from './src/screens/CreateWalletScreen';
 // import { TransactionHistoryScreen } from './src/screens/TransactionHistoryScreen';
 // import { WalletDetailScreen } from './src/screens/WalletDetailScreen';
 import { authService } from './src/services/authService';
+import { securityManager } from './src/utils/security';
 import { COLORS } from './src/constants/theme';
 
 const Stack = createStackNavigator();
@@ -64,12 +65,15 @@ export default function App() {
 
   const initializeAuth = async () => {
     try {
+      // Initialize security manager first
+      await securityManager.initialize();
+      
       // Initialize auth service to check for existing session
       await authService.initialize();
       const authState = authService.getAuthState();
       setIsAuthenticated(authState.isAuthenticated);
     } catch (error) {
-      console.error('Auth initialization failed:', error);
+      console.error('Initialization failed:', error);
       setIsAuthenticated(false);
     } finally {
       setIsLoading(false);

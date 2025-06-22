@@ -12,8 +12,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { MarketOverview } from '../components/MarketOverview';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { SUPPORTED_CRYPTOS } from '../constants/crypto';
 import { walletService } from '../services/walletService';
@@ -24,9 +26,16 @@ const { width } = Dimensions.get('window');
 
 interface DashboardScreenProps {
   navigation: any;
+  route?: {
+    params?: {
+      newWalletCreated?: boolean;
+      walletName?: string;
+      cryptoType?: string;
+    };
+  };
 }
 
-export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
+export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) => {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [totalBalance, setTotalBalance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,16 +45,30 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
 
   useEffect(() => {
     loadWallets();
-  }, []);
+    
+    // Check if we just created a new wallet
+    if (route?.params?.newWalletCreated) {
+      const { walletName, cryptoType } = route.params;
+      console.log(`🎉 Welcome to your new ${cryptoType} wallet: ${walletName}!`);
+      // Clear the params to prevent showing the message again
+      navigation.setParams({ newWalletCreated: false });
+    }
+  }, [route?.params]);
 
   const loadWallets = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.log('No current user found');
+      return;
+    }
 
     try {
+      console.log('Loading wallets for user:', currentUser.id);
+      
       // Initialize demo wallets if user doesn't have any
       await walletService.initializeDemoWallets(currentUser.id);
       
       const userWallets = walletService.getWalletsByUserId(currentUser.id);
+      console.log('Found wallets:', userWallets.length, userWallets);
       setWallets(userWallets);
       
       // Calculate total balance
@@ -62,6 +85,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
       
       setWallets([...userWallets]);
       setTotalBalance(total);
+      console.log('Loaded', userWallets.length, 'wallets with total balance:', total);
     } catch (error) {
       console.error('Failed to load wallets:', error);
       Alert.alert('Error', 'Failed to load wallets');
@@ -142,6 +166,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
     },
   ];
 
+  // Refresh wallets when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (currentUser) {
+        loadWallets();
+      }
+    }, [currentUser])
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -181,6 +214,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) 
               <Text style={styles.balanceChangeText}>+2.45% Today</Text>
             </View>
           </Card>
+
+          {/* Market Overview */}
+          <MarketOverview onCryptoPress={(cryptoType) => {
+            Alert.alert('Coming Soon', `${cryptoType} price details will be available soon`);
+          }} />
 
           {/* Quick Actions */}
           <View style={styles.section}>

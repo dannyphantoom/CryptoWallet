@@ -43,53 +43,23 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
     if (!currentUser) return;
 
     try {
-      // For demo purposes, generate mock transactions
-      const mockTransactions: Transaction[] = [
-        {
-          id: 'tx_1',
-          walletId: 'eth_wallet_1',
-          type: TransactionType.SEND,
-          amount: 0.5,
-          fee: 0.002,
-          fromAddress: '0x1234...5678',
-          toAddress: '0x8765...4321',
-          hash: '0xabcd...efgh',
-          status: TransactionStatus.CONFIRMED,
-          timestamp: new Date(Date.now() - 86400000), // 1 day ago
-        },
-        {
-          id: 'tx_2',
-          walletId: 'btc_wallet_1',
-          type: TransactionType.RECEIVE,
-          amount: 0.01,
-          fee: 0.0001,
-          fromAddress: 'bc1qxy2...kljh',
-          toAddress: 'bc1qab3...mnop',
-          hash: 'abc123...def456',
-          status: TransactionStatus.CONFIRMED,
-          timestamp: new Date(Date.now() - 172800000), // 2 days ago
-        },
-        {
-          id: 'tx_3',
-          walletId: 'sol_wallet_1',
-          type: TransactionType.SWAP,
-          amount: 10,
-          fee: 0.025,
-          fromAddress: '7xKXtj...9sVbm',
-          toAddress: '7xKXtj...9sVbm',
-          hash: '2WqHKj...8kQnm',
-          status: TransactionStatus.PENDING,
-          timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-          swapInfo: {
-            fromCrypto: CryptoType.SOLANA,
-            toCrypto: CryptoType.ETHEREUM,
-            fromAmount: 10,
-            toAmount: 0.25,
-          },
-        },
-      ];
+      // Load transactions from all user wallets
+      const userWallets = walletService.getWalletsByUserId(currentUser.id);
+      const allTransactions: Transaction[] = [];
 
-      setTransactions(mockTransactions);
+      for (const wallet of userWallets) {
+        try {
+          const walletTransactions = await walletService.getTransactionHistory(wallet.id);
+          allTransactions.push(...walletTransactions);
+        } catch (error) {
+          console.error(`Failed to load transactions for wallet ${wallet.id}:`, error);
+        }
+      }
+
+      // Sort transactions by timestamp (newest first)
+      allTransactions.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+      setTransactions(allTransactions);
     } catch (error) {
       console.error('Failed to load transactions:', error);
       Alert.alert('Error', 'Failed to load transaction history');

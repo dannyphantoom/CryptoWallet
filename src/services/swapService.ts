@@ -1,6 +1,7 @@
 import { SwapTransaction, SwapStatus, CryptoType } from '../types';
 import { walletService } from './walletService';
 import { SUPPORTED_CRYPTOS } from '../constants/crypto';
+import { configService } from './configService';
 
 // Mock exchange rates for demo purposes
 // In production, integrate with real exchange APIs like CoinGecko, Binance, etc.
@@ -26,12 +27,26 @@ export class SwapService {
     return SwapService.instance;
   }
 
-  async getExchangeRate(fromSymbol: string, toSymbol: string): Promise<number> {
+  async getExchangeRate(fromCrypto: CryptoType, toCrypto: CryptoType): Promise<number> {
     try {
-      if (fromSymbol === toSymbol) {
+      if (fromCrypto === toCrypto) {
         return 1;
       }
 
+      const fromSymbol = this.getCryptoSymbol(fromCrypto);
+      const toSymbol = this.getCryptoSymbol(toCrypto);
+
+      // Try to get live exchange rate from CoinGecko API
+      try {
+        const liveRate = await this.getLiveExchangeRate(fromSymbol, toSymbol);
+        if (liveRate) {
+          return liveRate;
+        }
+      } catch (error) {
+        console.warn('Failed to get live exchange rate, falling back to mock data:', error);
+      }
+
+      // Fallback to mock rates
       // Try direct rate
       const directKey = `${fromSymbol}_${toSymbol}`;
       if (MOCK_EXCHANGE_RATES[directKey]) {
@@ -49,7 +64,7 @@ export class SwapService {
       const toUsdRate = MOCK_EXCHANGE_RATES[`${toSymbol}_USD`];
 
       if (fromUsdRate && toUsdRate) {
-        return toUsdRate / fromUsdRate;
+        return fromUsdRate / toUsdRate;
       }
 
       throw new Error(`Exchange rate not available for ${fromSymbol} to ${toSymbol}`);
@@ -59,13 +74,57 @@ export class SwapService {
     }
   }
 
+  private async getLiveExchangeRate(fromSymbol: string, toSymbol: string): Promise<number | null> {
+    try {
+      const config = await configService.getConfig();
+      const coinGeckoIds: Record<string, string> = {
+        'ETH': 'ethereum',
+        'BTC': 'bitcoin',
+        'SOL': 'solana'
+      };
+
+      const fromId = coinGeckoIds[fromSymbol];
+      const toId = coinGeckoIds[toSymbol];
+
+      if (!fromId || !toId) {
+        return null;
+      }
+
+      const url = `${config.exchange.baseUrl}/simple/price?ids=${fromId}&vs_currencies=${toSymbol.toLowerCase()}`;
+      const headers: any = {};
+      
+      // Add API key if available
+      if (config.exchange.apiKey && config.exchange.apiKey !== 'your_api_key_here') {
+        headers['X-CG-Pro-API-Key'] = config.exchange.apiKey;
+      }
+
+      const response = await fetch(url, { headers });
+      const data = await response.json();
+
+      if (data[fromId] && data[fromId][toSymbol.toLowerCase()]) {
+        return data[fromId][toSymbol.toLowerCase()];
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to get live exchange rate:', error);
+      return null;
+    }
+  }
+
+  private getCryptoSymbol(cryptoType: CryptoType): string {
+    const crypto = SUPPORTED_CRYPTOS.find(c => c.type === cryptoType);
+    return crypto?.symbol || cryptoType.toUpperCase();
+  }
+
   async calculateSwapAmount(
     fromAmount: number,
-    fromSymbol: string,
-    toSymbol: string
+    fromCrypto: CryptoType,
+    toCrypto: CryptoType
   ): Promise<{ toAmount: number; rate: number; fee: number }> {
     try {
-      const rate = await this.getExchangeRate(fromSymbol, toSymbol);
+      const rate = await this.getExchangeRate(fromCrypto, toCrypto);
+      const fromSymbol = this.getCryptoSymbol(fromCrypto);
       const fee = this.calculateSwapFee(fromAmount, fromSymbol);
       const toAmount = (fromAmount - fee) * rate;
 
@@ -81,13 +140,10 @@ export class SwapService {
   }
 
   async executeSwap(
-    userId: string,
     fromWalletId: string,
     toWalletId: string,
     fromAmount: number,
-    toAmount: number,
-    fromSymbol: string,
-    toSymbol: string
+    toAmount: number
   ): Promise<SwapTransaction> {
     try {
       // Validate wallets
@@ -98,8 +154,8 @@ export class SwapService {
         throw new Error('Invalid wallet');
       }
 
-      if (fromWallet.userId !== userId || toWallet.userId !== userId) {
-        throw new Error('Unauthorized access to wallet');
+      if (fromWallet.userId !== toWallet.userId) {
+        throw new Error('Can only swap between your own wallets');
       }
 
       // Check balance
@@ -108,10 +164,13 @@ export class SwapService {
         throw new Error('Insufficient balance');
       }
 
+      const fromSymbol = this.getCryptoSymbol(fromWallet.type);
+      const toSymbol = this.getCryptoSymbol(toWallet.type);
+
       // Create swap transaction
       const swapTransaction: SwapTransaction = {
         id: `swap_${Date.now()}`,
-        userId,
+        userId: fromWallet.userId,
         fromWalletId,
         toWalletId,
         fromAmount,
